@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from contextlib import contextmanager
 from typing import Iterable, List
@@ -5,7 +6,7 @@ from typing import Iterable, List
 from siem.detector import Alert
 from siem.parser import Event
 
-DEFAULT_DB = "siem.db"
+DEFAULT_DB = os.environ.get("SIEM_DB", "siem.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
