@@ -1,0 +1,10 @@
+services:
+  siem:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - siem-data:/data
+
+volumes:
+  siem-data:
