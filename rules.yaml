@@ -1,0 +1,4 @@
+brute_force:
+  threshold: 5
+  window_seconds: 60
+  severity: high
