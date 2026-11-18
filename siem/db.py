@@ -96,3 +96,14 @@ def failures_per_hour(db_path: str = DEFAULT_DB) -> List[dict]:
             "GROUP BY hour ORDER BY hour"
         ).fetchall()
     return [dict(r) for r in rows]
+
+def summary(db_path: str = DEFAULT_DB) -> dict:
+    with connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT "
+            "(SELECT COUNT(*) FROM events) AS total_events, "
+            "(SELECT COUNT(*) FROM events WHERE event_type = 'failed_login') AS failed_logins, "
+            "(SELECT COUNT(DISTINCT ip) FROM events WHERE event_type = 'failed_login') AS unique_ips, "
+            "(SELECT COUNT(*) FROM alerts) AS alerts"
+        ).fetchone()
+    return dict(row)
