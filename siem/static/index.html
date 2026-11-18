@@ -1,92 +1,274 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mini SIEM</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
-    header { padding: 16px 24px; background: #1e293b; font-size: 20px; font-weight: 600; }
-    main { padding: 24px; max-width: 1100px; margin: auto; }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
-    .card { background: #1e293b; border-radius: 8px; padding: 16px; }
-    .card .num { font-size: 28px; font-weight: 700; }
-    .card .label { color: #94a3b8; font-size: 13px; }
-    .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; margin: 16px 0; }
-    table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; }
-    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #334155; font-size: 14px; }
-    .sev { color: #f87171; font-weight: 600; }
-    h2 { margin-top: 28px; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini SIEM</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0b1120;
+    --panel: #121a2e;
+    --panel-border: #1f2b47;
+    --text: #e2e8f0;
+    --muted: #7c8aa5;
+    --accent: #38bdf8;
+    --high: #f87171;
+    --med: #fbbf24;
+    --low: #4ade80;
+    --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    background-image: radial-gradient(circle at 20% 0%, #13213f 0%, var(--bg) 45%);
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--panel-border);
+    background: rgba(18, 26, 46, 0.6);
+    backdrop-filter: blur(6px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; letter-spacing: 0.2px; }
+  .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .status { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+  .status .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--low); animation: pulse 1.8s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  main { padding: 28px; max-width: 1180px; margin: auto; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent);
+  }
+  .card.alerts::before { background: var(--high); }
+  .card .num { font-size: 30px; font-weight: 700; line-height: 1.1; }
+  .card .label { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+  .charts { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 800px) { .charts { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .panel h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .panel canvas { max-height: 220px; }
+
+  .alerts-panel { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; overflow: hidden; }
+  .alerts-panel h3 { margin: 0; padding: 16px 18px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--panel-border); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 12px 18px; font-size: 14px; }
+  thead th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; border-bottom: 1px solid var(--panel-border); }
+  tbody tr { border-bottom: 1px solid var(--panel-border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .mono { font-family: "Cascadia Code", Consolas, monospace; font-size: 13px; color: #cbd5e1; }
+
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; }
+  .badge.high { background: rgba(248,113,113,0.15); color: var(--high); }
+  .badge.medium { background: rgba(251,191,36,0.15); color: var(--med); }
+  .badge.low { background: rgba(74,222,128,0.15); color: var(--low); }
+
+  .empty { padding: 40px 18px; text-align: center; color: var(--muted); }
+  .empty .big { font-size: 28px; margin-bottom: 6px; }
+
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 24px; }
+</style>
 </head>
 <body>
-  <header>Mini SIEM</header>
-  <main>
-    <div class="cards" id="cards"></div>
-    <div class="charts">
-      <div class="card"><canvas id="attackers"></canvas></div>
-      <div class="card"><canvas id="hourly"></canvas></div>
+<header>
+  <div class="brand"><span class="dot"></span>Mini SIEM</div>
+  <div class="status"><span class="pulse"></span><span id="updated">Loading…</span></div>
+</header>
+
+<main>
+  <div class="cards" id="cards"></div>
+
+  <div class="charts">
+    <div class="panel">
+      <h3>Failed Logins Over Time</h3>
+      <canvas id="hourly"></canvas>
     </div>
-    <h2>Recent alerts</h2>
-    <table>
-      <thead><tr><th>Time</th><th>Severity</th><th>Rule</th><th>IP</th><th>Description</th></tr></thead>
-      <tbody id="alerts"></tbody>
-    </table>
-  </main>
-  <script>
-    const getJSON = (url) => fetch(url).then(r => r.json());
+    <div class="panel">
+      <h3>Top Attacking IPs</h3>
+      <canvas id="attackers"></canvas>
+    </div>
+  </div>
 
-    function cell(text, cls) {
-      const td = document.createElement("td");
-      td.textContent = text;           // textContent, never innerHTML: log data is untrusted
-      if (cls) td.className = cls;
-      return td;
+  <div class="alerts-panel">
+    <h3>Recent Alerts</h3>
+    <div id="alertsBody"></div>
+  </div>
+</main>
+
+<footer>Mini SIEM — refreshes automatically every 10s</footer>
+
+<script>
+  const getJSON = (url) => fetch(url).then(r => r.json());
+  let charts = {};
+
+  function sevClass(sev) {
+    const s = (sev || "").toLowerCase();
+    return ["high", "medium", "low"].includes(s) ? s : "medium";
+  }
+
+  function renderCards(summary) {
+    const defs = [
+      ["Total Events", summary.total_events, "card"],
+      ["Failed Logins", summary.failed_logins, "card"],
+      ["Unique Attacker IPs", summary.unique_ips, "card"],
+      ["Active Alerts", summary.alerts, "card alerts"],
+    ];
+    const cards = document.getElementById("cards");
+    cards.replaceChildren();
+    for (const [label, value, cls] of defs) {
+      const div = document.createElement("div");
+      div.className = cls;
+      const num = document.createElement("div");
+      num.className = "num"; num.textContent = value;
+      const lab = document.createElement("div");
+      lab.className = "label"; lab.textContent = label;
+      div.append(num, lab);
+      cards.appendChild(div);
     }
+  }
 
-    async function load() {
-      const [summary, alerts, attackers, hourly] = await Promise.all([
-        getJSON("/api/summary"), getJSON("/api/alerts"),
-        getJSON("/api/top-attackers"), getJSON("/api/failures-per-hour"),
-      ]);
-
-      const cards = document.getElementById("cards");
-      cards.replaceChildren();
-      for (const [label, key] of [["Events", "total_events"], ["Failed logins", "failed_logins"],
-                                  ["Unique attacker IPs", "unique_ips"], ["Alerts", "alerts"]]) {
-        const div = document.createElement("div");
-        div.className = "card";
-        const num = document.createElement("div");
-        num.className = "num"; num.textContent = summary[key];
-        const lab = document.createElement("div");
-        lab.className = "label"; lab.textContent = label;
-        div.append(num, lab);
-        cards.appendChild(div);
-      }
-
-      const tbody = document.getElementById("alerts");
-      tbody.replaceChildren();
-      for (const a of alerts) {
-        const tr = document.createElement("tr");
-        tr.append(cell(a.timestamp.replace("T", " ")), cell(a.severity.toUpperCase(), "sev"),
-                  cell(a.rule), cell(a.ip), cell(a.description));
-        tbody.appendChild(tr);
-      }
-
-      new Chart(document.getElementById("attackers"), {
-        type: "bar",
-        data: { labels: attackers.map(a => a.ip),
-                datasets: [{ label: "Failed attempts", data: attackers.map(a => a.failed_attempts) }] },
-        options: { plugins: { title: { display: true, text: "Top attacking IPs" } } },
-      });
-      new Chart(document.getElementById("hourly"), {
-        type: "line",
-        data: { labels: hourly.map(h => h.hour.replace("T", " ") + ":00"),
-                datasets: [{ label: "Failed logins", data: hourly.map(h => h.failures), tension: 0.3 }] },
-        options: { plugins: { title: { display: true, text: "Failed logins per hour" } } },
-      });
+  function renderAlerts(alerts) {
+    const container = document.getElementById("alertsBody");
+    container.replaceChildren();
+    if (!alerts.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      const big = document.createElement("div");
+      big.className = "big"; big.textContent = "✅";
+      const msg = document.createElement("div");
+      msg.textContent = "No alerts yet — all clear.";
+      empty.append(big, msg);
+      container.appendChild(empty);
+      return;
     }
-    load();
-  </script>
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    thead.innerHTML = "<tr><th>Time</th><th>Severity</th><th>Rule</th><th>Source IP</th><th>Description</th></tr>";
+    const tbody = document.createElement("tbody");
+    for (const a of alerts) {
+      const tr = document.createElement("tr");
+
+      const tdTime = document.createElement("td");
+      tdTime.className = "mono"; tdTime.textContent = a.timestamp.replace("T", " ");
+
+      const tdSev = document.createElement("td");
+      const badge = document.createElement("span");
+      badge.className = "badge " + sevClass(a.severity);
+      badge.textContent = (a.severity || "").toUpperCase();
+      tdSev.appendChild(badge);
+
+      const tdRule = document.createElement("td");
+      tdRule.textContent = a.rule;
+
+      const tdIp = document.createElement("td");
+      tdIp.className = "mono"; tdIp.textContent = a.ip;
+
+      const tdDesc = document.createElement("td");
+      tdDesc.textContent = a.description;
+
+      tr.append(tdTime, tdSev, tdRule, tdIp, tdDesc);
+      tbody.appendChild(tr);
+    }
+    table.append(thead, tbody);
+    container.appendChild(table);
+  }
+
+  function upsertChart(key, canvasId, config) {
+    if (charts[key]) {
+      charts[key].data = config.data;
+      charts[key].update();
+    } else {
+      charts[key] = new Chart(document.getElementById(canvasId), config);
+    }
+  }
+
+  function chartTheme() {
+    Chart.defaults.color = "#7c8aa5";
+    Chart.defaults.borderColor = "#1f2b47";
+    Chart.defaults.font.family = "Segoe UI, system-ui, sans-serif";
+  }
+
+  async function load() {
+    const [summary, alerts, attackers, hourly] = await Promise.all([
+      getJSON("/api/summary"),
+      getJSON("/api/alerts"),
+      getJSON("/api/top-attackers"),
+      getJSON("/api/failures-per-hour"),
+    ]);
+
+    renderCards(summary);
+    renderAlerts(alerts);
+
+    upsertChart("hourly", "hourly", {
+      type: "line",
+      data: {
+        labels: hourly.map(h => h.hour.replace("T", " ") + ":00"),
+        datasets: [{
+          label: "Failed logins",
+          data: hourly.map(h => h.failures),
+          borderColor: "#38bdf8",
+          backgroundColor: "rgba(56,189,248,0.12)",
+          fill: true,
+          tension: 0.35,
+          pointRadius: 3,
+        }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+
+    upsertChart("attackers", "attackers", {
+      type: "bar",
+      data: {
+        labels: attackers.map(a => a.ip),
+        datasets: [{
+          label: "Failed attempts",
+          data: attackers.map(a => a.failed_attempts),
+          backgroundColor: "#f87171",
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        indexAxis: "y",
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+
+    document.getElementById("updated").textContent =
+      "Updated " + new Date().toLocaleTimeString();
+  }
+
+  chartTheme();
+  load();
+  setInterval(load, 10000);
+</script>
 </body>
 </html>
